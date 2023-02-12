@@ -1,0 +1,20 @@
+{
+  "name": "microservice",
+  "version": "1.0.0",
+  "description": "Serverless Framework projects",
+  "author": "Igor Mokhantskyy <gigorko35@gmail.com>",
+  "license": "",
+  "devDependencies": {
+    "babel-core": "^4.7.16",
+    "babel-loader": "^7.1.1",
+    "babel-plugin-transform-runtime": "^6.23.0",
+    "babel-polyfill": "^6.23.0",
+    "babel-preset-env": "^1.6.0",
+    "serverless-bundle": "^6.0.0",
+    "serverless-pseudo-parameters": "^2.5.0",
+    "webpack": "^4.35.2"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.639.0"
+  }
+}
