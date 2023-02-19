@@ -1,20 +1,181 @@
-service:
-  name: microservice
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: microservice-pdp
+# app and org for use with dashboard.serverless.com
+#app: your-app-name
+#org: your-org-name
+
+# You can pin your service to only deploy with a specific Serverless version
+# Check out our docs for more details
+frameworkVersion: '3'
 
 plugins:
-  - serverless-bundle
-  - serverless-pseudo-parameters
+  - serverless-offline
+
+custom:
+  AUCTION_TABLE_NAME: 'Auction-${self:provider.stage}'
+  serverless-offline:
+    host: 0.0.0.0
+    httpPort: 4001
+    lambdaPort: 4002
+  # stageDomainPrefix:
+  #   local: ".local"
+  #   dev: ".dev"
+  #   qa: ".qa"
+  #   staging: ".staging"
+  #   prod: ""
+
+useDotenv: true
 
 provider:
   name: aws
   runtime: nodejs16.x
+  region: eu-west-1
   memorySize: 256
   stage: ${opt:stage, 'dev'}
-  
+  profile: pdp-auction
+  # you can overwrite defaults here
+  #  stage: dev
+  #  region: us-west-1
+  # you can add statements to the Lambda function's IAM Role here
+  iam:
+    role:
+      statements:
+        - Effect: 'Allow'
+          Action:
+            - 'dynamodb:Scan'
+            - 'dynamodb:GetItem'
+            - 'dynamodb:PutItem'
+            - 'dynamodb:UpdateItem'
+            - 'dynamodb:DeleteItem'
+          Resource:
+            - 'arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.AUCTION_TABLE_NAME}'
+# you can define service wide environment variables here
+#  environment:
+#    variable1: value1
+
+# you can add packaging information here
+#package:
+#  patterns:
+#    - '!exclude-me.js'
+#    - '!exclude-me-dir/**'
+#    - include-me.js
+#    - include-me-dir/**
 functions:
-  hello:
-    handler: src/handlers/hello.handler
+  createAuction:
+    handler:  handler.createAuctionHandler
+    events:
+      - http:
+          method: POST
+          path: /auction
+  deleteAuction:
+    handler:  handler.deleteAuctionHandler
+    events:
+      - http:
+          method: DELETE
+          path: /auction/{auctionId}
+  getAuctionById:
+    handler:  handler.findAuctionByIdHandler
     events:
       - http:
           method: GET
-          path: /hello
+          path: /auction/{auctionId}
+  auctionList:
+    handler:  handler.getAuctionsListHandler
+    events:
+      - http:
+          method: GET
+          path: /auctions
+  placeBid:
+    handler:  handler.placeBidHandler
+    events:
+      - http:
+          method: PATCH
+          path: /auction/{auctionId}/bid
+#    The following are a few example events you can configure
+#    NOTE: Please make sure to change your handler code to work with those events
+#    Check the event documentation for details
+#    events:
+#      - httpApi:
+#          path: /users/create
+#          method: get
+#      - websocket: $connect
+#      - s3: ${env:BUCKET}
+#      - schedule: rate(10 minutes)
+#      - sns: greeter-topic
+#      - stream: arn:aws:dynamodb:region:XXXXXX:table/foo/stream/1970-01-01T00:00:00.000
+#      - alexaSkill: amzn1.ask.skill.xx-xx-xx-xx
+#      - alexaSmartHome: amzn1.ask.skill.xx-xx-xx-xx
+#      - iot:
+#          sql: "SELECT * FROM 'some_topic'"
+#      - cloudwatchEvent:
+#          event:
+#            source:
+#              - "aws.ec2"
+#            detail-type:
+#              - "EC2 Instance State-change Notification"
+#            detail:
+#              state:
+#                - pending
+#      - cloudwatchLog: '/aws/lambda/hello'
+#      - cognitoUserPool:
+#          pool: MyUserPool
+#          trigger: PreSignUp
+#      - alb:
+#          listenerArn: arn:aws:elasticloadbalancing:us-east-1:XXXXXX:listener/app/my-load-balancer/50dc6c495c0c9188/
+#          priority: 1
+#          conditions:
+#            host: example.com
+#            path: /hello
+
+#    Define function environment variables here
+#    environment:
+#      variable2: value2
+
+# you can add CloudFormation resource templates here
+resources:
+  Resources:
+    Auction: 
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.AUCTION_TABLE_NAME}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          WriteCapacityUnits: 1
+          ReadCapacityUnits: 1
+# resources:
+#   Resources:
+#     taskTable:
+#       Type: 'AWS::DynamoDB::Table'
+#       Properties:
+#         TableName: ${self:custom.TASK_DYNAMODB_TABLE}
+#         AttributeDefinitions:
+#           - AttributeName: taskId
+#             AttributeType: S
+#         KeySchema:
+#           - AttributeName: taskId
+#             KeyType: HASH
+#         ProvisionedThroughput:
+#           WriteCapacityUnits: 1
+#           ReadCapacityUnits: 1
+#  Outputs:
+#     NewOutput:
+#       Description: "Description for the output"
+#       Value: "Some output value"
+
