@@ -2,10 +2,10 @@
 
 const {
   createAuction,
-  deleteAuction,
-  findAuctionById,
+  deleteAuctionById,
+  findAuction,
   getAuctionsList,
-  placeBid
+  placeBid,
 } = require('./src/handlers/auctions');
 const { createResponse } = require('./src/handlers/responseHandler');
 
@@ -27,7 +27,7 @@ const deleteAuctionHandler = (event, context, callback) => {
      const {
 auctionId  } = event.pathParameters;
 
-    deleteAuction(auctionId, callback);
+    deleteAuctionById(auctionId, callback);
 
   } else {
     callback(
@@ -40,7 +40,7 @@ const findAuctionByIdHandler = (event, context, callback) => {
   if (event.httpMethod === "GET") {
     const { auctionId } = event.pathParameters;
 
-    findAuctionById(auctionId, callback);
+    findAuction(auctionId, callback);
 
   } else {
     callback(
@@ -65,6 +65,8 @@ const placeBidHandler = (event, context, callback) => {
   if (event.httpMethod === "PATCH") {
     const { auctionId } = event.pathParameters;
     const { amount } = JSON.parse(event.body);
+    console.log("############ auctionId: ", auctionId);
+    console.log("############ amount from body: ", amount);
 
 
     placeBid(auctionId, amount, callback);

@@ -1,5 +1,5 @@
-const AWS = require('aws-sdk');
-const { createResponse } = require('./responseHandler');
+// const AWS = require('aws-sdk');
+// const { createResponse } = require('./responseHandler');
 const { v4: uuid } = require('uuid');
 // const { middy } = require('@middy/core');
 // const { httpJsonBodyParser } = require('@middy/http-json-body-parser')
@@ -10,17 +10,20 @@ const stage = process.env.stage || "dev"
 const tableName = `${name}-${stage}`;
 
 
-const dynamo = new AWS.DynamoDB.DocumentClient();
-
-const putAuction = (auction) => {
+// const dynamo = new AWS.DynamoDB.DocumentClient();
+const dynamo = require('./dynamodb')
+const putAuction = (title) => {
   const now = new Date();
+  const endDate = new Date();
+  endDate.setHours(now.getHours() + 1);
 
   const auction = {
     id: uuid(),
     title,
     status: "Open",
-      createdAt: now.toISOString(),
-      highestBid: {
+    createdAt: now.toISOString(),
+    endingAt: endDate.toISOString(),
+    highestBid: {
         amount: 0
     }
   }
@@ -31,7 +34,7 @@ const putAuction = (auction) => {
       Item: auction
     })
     .promise()
-    .then(() => task.taskId);
+    .then(() => auction);
 };
 
 const deleteAuction = (auctionId) => {
@@ -67,39 +70,76 @@ const scanAuctions = () => {
             TableName: tableName,
         })
         .promise()
-        .then(({ Item }) => Item);
+      .then(({Items}) =>Items);
 };
 
 const addBid = (id, amount) => {
-    const params = {
-        TableName: tableName,
-        Key: { id },
-        UpdateExpression: 'set highestBid.amount = :amount',
-        ExpressionAttributeValues: {
-            ':amount': amount,
-        },
-        ReturnValues: "ALL_NEW",
-    }
-
+const params = {
+    TableName: tableName,
+    Key: { id },
+    UpdateExpression: 'set highestBid.amount = :amount',
+    ExpressionAttributeValues: {
+      ':amount': amount,
+    },
+    ReturnValues: 'ALL_NEW',
+};
+  
     let updatedAuction;
     try {
-    const result = dynamo
+      const result = dynamo
         .update(params)
-        .promise()
-        .then(({ Attributes }) => Attributes);
-        updatedAuction = result;
+        .promise();
+        updatedAuction = result.Attributes;
     } catch (err) {
         
     }
     return updatedAuction
 };
 
+const  closeAuction = async(auction) => {
+  const params = {
+    TableName: tableName,
+    Key: { id: auction.id },
+    UpdateExpression: 'set #status = :status',
+    ExpressionAttributeValues: {
+      ':status': 'CLOSED',
+    },
+    ExpressionAttributeNames: {
+      '#status': 'status',
+    },
+  };
+
+  const result = await dynamodb.update(params).promise();
+  return result;
+}
+
+const getEndedAuctions = async () => {
+  const now = new Date();
+  const params = {
+    TableName: process.env.AUCTIONS_TABLE_NAME,
+    IndexName: 'statusAndEndDate',
+    KeyConditionExpression: '#status = :status AND endingAt <= :now',
+    ExpressionAttributeValues: {
+      ':status': 'OPEN',
+      ':now': now.toISOString(),
+    },
+    ExpressionAttributeNames: {
+      '#status': 'status',
+    },
+  };
+
+  const result = await dynamodb.query(params).promise();
+  return result.Items;
+}
+
 module.exports = {
   putAuction,
   deleteAuction,
   findAuctionById,
   scanAuctions,
-  addBid
+  addBid,
+  closeAuction,
+  getEndedAuctions
 }
 
 

@@ -28,7 +28,7 @@ custom:
   serverless-offline:
     host: 0.0.0.0
     httpPort: 4001
-    lambdaPort: 4002
+    lambdaPort: 4003
   # stageDomainPrefix:
   #   local: ".local"
   #   dev: ".dev"
@@ -59,8 +59,10 @@ provider:
             - 'dynamodb:PutItem'
             - 'dynamodb:UpdateItem'
             - 'dynamodb:DeleteItem'
+            - 'dynamodb:Query'
           Resource:
             - 'arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.AUCTION_TABLE_NAME}'
+            - !Join ['/', [ 'arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.AUCTION_TABLE_NAME}', 'index', 'statusAndEndDate' ]]
 # you can define service wide environment variables here
 #  environment:
 #    variable1: value1
@@ -103,6 +105,11 @@ functions:
       - http:
           method: PATCH
           path: /auction/{auctionId}/bid
+  processAuctions:
+    handler: src/handlers/auctions.processAuctions
+    # events:
+    #   - schedule: rate(1 minute)
+
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
 #    Check the event documentation for details
@@ -151,31 +158,25 @@ resources:
       Properties:
         TableName: ${self:custom.AUCTION_TABLE_NAME}
         AttributeDefinitions:
-          - AttributeName: id
-            AttributeType: S
+         - AttributeName: id
+           AttributeType: S
+        #  - AttributeName: status
+        #    AttributeType: S
+        #  - AttributeName: endingAt
+        #    AttributeType: S
         KeySchema:
           - AttributeName: id
             KeyType: HASH
         ProvisionedThroughput:
           WriteCapacityUnits: 1
           ReadCapacityUnits: 1
-# resources:
-#   Resources:
-#     taskTable:
-#       Type: 'AWS::DynamoDB::Table'
-#       Properties:
-#         TableName: ${self:custom.TASK_DYNAMODB_TABLE}
-#         AttributeDefinitions:
-#           - AttributeName: taskId
-#             AttributeType: S
-#         KeySchema:
-#           - AttributeName: taskId
-#             KeyType: HASH
-#         ProvisionedThroughput:
-#           WriteCapacityUnits: 1
-#           ReadCapacityUnits: 1
-#  Outputs:
-#     NewOutput:
-#       Description: "Description for the output"
-#       Value: "Some output value"
+        # GlobalSecondaryIndexes:
+        #   - IndexName: statusAndEndDate
+        #     KeySchema:
+        #       - AttributeName: status
+        #         KeyType: HASH
+        #       - AttributeName: endingAt
+        #         KeyType: RANGE
+        #     Projection:
+        #       ProjectionType: ALL
 

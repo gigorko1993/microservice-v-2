@@ -2,8 +2,10 @@ const {
   putAuction,
   deleteAuction,
   findAuctionById,
-scanAuctions,
-  addBid
+  scanAuctions,
+  addBid,
+  closeAuction,
+  getEndedAuctions
 } = require('./auctionManager');
 const { createResponse } = require('./responseHandler');
 
@@ -19,7 +21,7 @@ const createAuction = (title, callback) => {
       callback(null, createResponse(500, 'Error on saving auction'));
     });
 };
-const deleteAuction = (auctionId, callback) => {
+const deleteAuctionById = (auctionId, callback) => {
   
   deleteAuction(auctionId)
     .then(res => {
@@ -31,7 +33,7 @@ const deleteAuction = (auctionId, callback) => {
       callback(null, createResponse(500, 'Error on saving auction'));
     });
 };
-const findAuctionById = (auctionId, callback) => {
+const findAuction = (auctionId, callback) => {
         const auction = findAuctionById(auctionId)
           .then(res => {
             console.log('response: ', res);
@@ -58,39 +60,44 @@ const getAuctionsList = (callback) => {
           });
 };
 
-const placeBid = (auctionId, amount, callback) => {
-        const auction = findAuctionById(auctionId)
-          .then(res => {
-            console.log('response from getAuctionById: ', res);
-            res;
-          })
-          .catch(err => {
+const placeBid = async (auctionId, amount, callback) => {
+  let auction;
+  try {
+    auction = await findAuctionById(auctionId);
+  } catch(err) {
             console.log(err);
-            callback(null, createResponse(500, 'Error on get auction by Id'));
-          });
-    if (!auction) {
-        throw new Error(`No auction with id: ${auctionId}`)
+            callback(null, createResponse(500, 'Error on get auction by Id in place bid operation'));
+          };
+  if (!auction) {
+      return callback(null, createResponse(400, `No auction with id: ${auctionId}`))
     }
-    if (amount <= auction.highestBid.amount) {
-        throw new Error(`Your bid must be higher that existing bid: ${auction.highestBid.amount}`);
-    }
-    addBid(auctionId, amount)
-        .then(res => {
-            console.log('response: ', res);
-            callback(null, createResponse(200, res));
-          })
-          .catch(err => {
-            console.log(err);
-            callback(null, createResponse(500, 'Error on saving bid'));
-          });
+
+  if (amount <= auction?.highestBid?.amount) {
+      return callback(null, createResponse(400, `Your bid must be higher that existing bid: ${auction.highestBid.amount}`));
+  }
+  
+  await addBid(auctionId, amount);
+
+  return callback(null, createResponse(204, {auctionId, amount}));
 };
 
-
+const processAuctions = async (event, context, callback) => {
+  try {
+    const auctionsToClose = await getEndedAuctions();
+    const closePromises = auctionsToClose.map(auction => closeAuction(auction));
+    await Promise.all(closePromises);
+    return createResponse(204,  { closed: closePromises.length });
+  } catch (error) {
+    console.error(error);
+    return createResponse(400, `Error on closing auctions`);
+  }
+}
 
 module.exports = {
   createAuction,
-  deleteAuction,
-  findAuctionById,
+  deleteAuctionById,
+  findAuction,
   getAuctionsList,
-  placeBid
+  placeBid,
+  processAuctions
 };
