@@ -24,7 +24,11 @@ plugins:
   - serverless-offline
 
 custom:
+  authorizer: arn:aws:lambda:${self:provider.region}:985430231206:function:auth-service-${self:provider.stage}-auth
   AUCTION_TABLE_NAME: 'Auction-${self:provider.stage}'
+  MailQueue:
+    arn: ${cf:microservice-notification-${self:provider.stage}.MailQueueArn}
+    url: ${cf:microservice-notification-${self:provider.stage}.MailQueueUrl}
   serverless-offline:
     host: 0.0.0.0
     httpPort: 4001
@@ -63,6 +67,10 @@ provider:
           Resource:
             - 'arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.AUCTION_TABLE_NAME}'
             - !Join ['/', [ 'arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.AUCTION_TABLE_NAME}', 'index', 'statusAndEndDate' ]]
+        - Effect: 'Allow'
+          Action:
+           - sqs:SendMessage
+          Resource: ${self:custom.MailQueue.arn}
 # you can define service wide environment variables here
 #  environment:
 #    variable1: value1
@@ -81,30 +89,35 @@ functions:
       - http:
           method: POST
           path: /auction
+          authorizer: ${self:custom.authorizer}
   deleteAuction:
     handler:  handler.deleteAuctionHandler
     events:
       - http:
           method: DELETE
           path: /auction/{auctionId}
+          authorizer: ${self:custom.authorizer}
   getAuctionById:
     handler:  handler.findAuctionByIdHandler
     events:
       - http:
           method: GET
           path: /auction/{auctionId}
+          authorizer: ${self:custom.authorizer}
   auctionList:
     handler:  handler.getAuctionsListHandler
     events:
       - http:
           method: GET
-          path: /auctions
+          path: /auctions/{status}
+          authorizer: ${self:custom.authorizer}
   placeBid:
     handler:  handler.placeBidHandler
     events:
       - http:
           method: PATCH
           path: /auction/{auctionId}/bid
+          authorizer: ${self:custom.authorizer}
   processAuctions:
     handler: src/handlers/auctions.processAuctions
     # events:
@@ -160,23 +173,26 @@ resources:
         AttributeDefinitions:
          - AttributeName: id
            AttributeType: S
-        #  - AttributeName: status
-        #    AttributeType: S
-        #  - AttributeName: endingAt
-        #    AttributeType: S
+         - AttributeName: status
+           AttributeType: S
+         - AttributeName: endingAt
+           AttributeType: S
         KeySchema:
           - AttributeName: id
             KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: statusAndEndDate
+            KeySchema:
+              - AttributeName: status
+                KeyType: HASH
+              - AttributeName: endingAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              WriteCapacityUnits: 1
+              ReadCapacityUnits: 1
         ProvisionedThroughput:
           WriteCapacityUnits: 1
           ReadCapacityUnits: 1
-        # GlobalSecondaryIndexes:
-        #   - IndexName: statusAndEndDate
-        #     KeySchema:
-        #       - AttributeName: status
-        #         KeyType: HASH
-        #       - AttributeName: endingAt
-        #         KeyType: RANGE
-        #     Projection:
-        #       ProjectionType: ALL
 

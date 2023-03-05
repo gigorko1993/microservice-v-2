@@ -13,7 +13,9 @@ const createAuctionHandler = (event, context, callback) => {
   if (event.httpMethod === "POST") {
     const { title } = JSON.parse(event.body);
 
-    createAuction(title, callback);
+    const { email, nickname } = event.requestContext.authorizer;
+
+    createAuction(title, email, nickname, callback);
 
   } else {
     callback(
@@ -51,8 +53,9 @@ const findAuctionByIdHandler = (event, context, callback) => {
 };
 const getAuctionsListHandler = (event, context, callback) => {
   if (event.httpMethod === "GET") {
+    const { status } = event.pathParameters;
 
-    getAuctionsList(callback);
+    getAuctionsList(status, callback);
 
   } else {
     callback(
@@ -65,11 +68,9 @@ const placeBidHandler = (event, context, callback) => {
   if (event.httpMethod === "PATCH") {
     const { auctionId } = event.pathParameters;
     const { amount } = JSON.parse(event.body);
-    console.log("############ auctionId: ", auctionId);
-    console.log("############ amount from body: ", amount);
+    const { email, nickname } = event.requestContext.authorizer;
 
-
-    placeBid(auctionId, amount, callback);
+    placeBid(auctionId, amount, email, nickname, callback);
 
   } else {
     callback(
