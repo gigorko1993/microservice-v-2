@@ -96,20 +96,21 @@ const placeBid = async (auctionId, amount, email, nickname, callback) => {
   callback(null, createResponse(204, {auctionId, amount, email, nickname}));
 };
 
-const processAuctions = async (event, context, callback) => {
+const processAuctions = async (_event, _context, callback) => {
   try {
-    const auctionsToClose = await getEndedAuctions();
-    console.log("auctionsToClose: ", auctionsToClose);
+  const auctionsToClose = await getEndedAuctions();
+    console.log("auctionsToClose in handler: ", auctionsToClose);
 
-    const closePromises = auctionsToClose.map(auction => closeAuction(auction));
-    console.log("closePromises: ", closePromises);
+    if (auctionsToClose.length) {
+      const closePromises = await Promise.all(auctionsToClose.map(async(auction) => await closeAuction(auction)));
 
-    await Promise.all(closePromises);
-    console.log("closePromises: ", closePromises);
-
-    return callback(null, createResponse(204,  { closed: closePromises.length }));
+        console.log("closePromises: ", closePromises);
+        callback(null, createResponse(204,  { closed: closePromises.length }));
+    }
+    
+      callback(null, createResponse(204,  { closed: auctionsToClose.length }));
   } catch (error) {
-    return callback(null, createResponse(400, `Error on closing auctions`));
+    callback(null, createResponse(400, `Error on closing auctions`, auctionsToClose,closePromises ));
   }
 }
 

@@ -85,6 +85,6 @@ module.exports = {
   deleteAuctionHandler,
   findAuctionByIdHandler,
   getAuctionsListHandler,
-  placeBidHandler
+  placeBidHandler,
 }
   

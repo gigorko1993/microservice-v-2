@@ -8,7 +8,7 @@ const { v4: uuid } = require('uuid');
 const name = process.env.AUCTION_TABLE_NAME || "Auction"
 const stage = process.env.stage || "dev"
 const tableName = `${name}-${stage}`;
-
+const QueueUrl = "https://sqs.eu-west-1.amazonaws.com/985430231206/MailQueue-dev";
 
 // const dynamo = new AWS.DynamoDB.DocumentClient();
 const dynamo = require('./dynamodb');
@@ -114,6 +114,18 @@ const closeAuction = async (auction) => {
   const { id, title, seller, highestBid } = auction;
   const { amount, bidder } = highestBid;
 
+  if (amount === 0) {
+  const notifySeller = await sqs.sendMessage({
+    QueueUrl: QueueUrl,
+    MessageBody: JSON.stringify({
+      subject: 'No bids on your auction :(',
+      recipient: seller,
+      body: `Your Item ${title} didn't get any bids. Better luck next time`
+    })
+  }).promise();
+    return notifySeller;
+  }
+
   const params = {
     TableName: tableName,
     Key: { id },
@@ -129,7 +141,7 @@ const closeAuction = async (auction) => {
   await dynamo.update(params).promise();
   
   const notifySeller = sqs.sendMessage({
-    QueueUrl: process.env.MAIL_QUEUE_URL,
+    QueueUrl: QueueUrl,
     MessageBody: JSON.stringify({
       subject: 'Your Item has been sold',
       recipient: seller,
@@ -138,7 +150,7 @@ const closeAuction = async (auction) => {
   }).promise();
 
   const notifyBidder = sqs.sendMessage({
-    QueueUrl: process.env.MAIL_QUEUE_URL,
+    QueueUrl: QueueUrl,
     MessageBody: JSON.stringify({
       subject: 'Your won an auction',
       recipient: bidder,
@@ -146,17 +158,17 @@ const closeAuction = async (auction) => {
     })
   }).promise();
 
-  return Promise.all([notifySeller, notifyBidder])
+  return await Promise.all([notifySeller, notifyBidder])
 };
 
 const getEndedAuctions = async () => {
   const now = new Date();
   const params = {
-    TableName: process.env.AUCTIONS_TABLE_NAME,
+    TableName: tableName,
     IndexName: 'statusAndEndDate',
     KeyConditionExpression: '#status = :status AND endingAt <= :now',
     ExpressionAttributeValues: {
-      ':status': 'OPEN',
+      ':status': 'Open',
       ':now': now.toISOString(),
     },
     ExpressionAttributeNames: {
@@ -165,6 +177,7 @@ const getEndedAuctions = async () => {
   };
 
   const result = await dynamo.query(params).promise();
+
   return result.Items;
 }
 
