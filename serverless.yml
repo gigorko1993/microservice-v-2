@@ -29,6 +29,8 @@ custom:
   MailQueue:
     arn: ${cf:microservice-notification-${self:provider.stage}.MailQueueArn}
     url: ${cf:microservice-notification-${self:provider.stage}.MailQueueUrl}
+  AuctionsBucket:
+    name: auction-bucket-random123-${self:provider.stage}
   serverless-offline:
     host: 0.0.0.0
     httpPort: 4001
@@ -71,6 +73,10 @@ provider:
           Action:
            - sqs:SendMessage
           Resource: ${self:custom.MailQueue.arn}
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+          Resource: arn:aws:s3:::${self:custom.AuctionsBucket.name}/*
 # you can define service wide environment variables here
 #  environment:
 #    variable1: value1
@@ -122,6 +128,14 @@ functions:
     handler: src/handlers/auctions.processAuctions
     # events:
     #   - schedule: rate(1 minute)
+
+  uploadAuctionPicture:
+    handler: src/handlers/uploadAuctionPicture.handler
+    events:
+      - http:
+          method: PATCH
+          path: auction/{auctionId}/picture
+          authorizer: ${self:custom.authorizer}
 
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
@@ -195,4 +209,24 @@ resources:
         ProvisionedThroughput:
           WriteCapacityUnits: 1
           ReadCapacityUnits: 1
-
+    AuctionsBucket: 
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.AuctionsBucket.name}
+        LifecycleConfiguration:
+          Rules:
+          - Id: ExpirePictures
+            Status: Enabled
+            ExpirationInDays: 1
+    AuctionsBucketPolicy: 
+        Type: AWS::S3::BucketPolicy
+        Properties:
+          Bucket: !Ref AuctionsBucket
+          PolicyDocument:
+            Statement:
+              - Sid: PublicRead
+                Effect: Allow
+                Principal: '*'
+                Action:
+                  - s3:GetObject
+                Resource: arn:aws:s3:::${self:custom.AuctionsBucket.name}/*

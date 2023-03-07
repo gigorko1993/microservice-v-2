@@ -1,17 +1,19 @@
-const AWS = require('aws-sdk');
+const AWS = require("aws-sdk");
 // const { createResponse } = require('./responseHandler');
-const { v4: uuid } = require('uuid');
+const { v4: uuid } = require("uuid");
 // const { middy } = require('@middy/core');
 // const { httpJsonBodyParser } = require('@middy/http-json-body-parser')
 // const { httpEventNormalizer } = require('@middy/http-event-normalizer')
 // const { httpErrorHandler } = require('@middy/http-error-handler') 29 video
-const name = process.env.AUCTION_TABLE_NAME || "Auction"
-const stage = process.env.stage || "dev"
+const name = process.env.AUCTION_TABLE_NAME || "Auction";
+const stage = process.env.stage || "dev";
 const tableName = `${name}-${stage}`;
-const QueueUrl = "https://sqs.eu-west-1.amazonaws.com/985430231206/MailQueue-dev";
+const QueueUrl =
+  "https://sqs.eu-west-1.amazonaws.com/985430231206/MailQueue-dev";
 
 // const dynamo = new AWS.DynamoDB.DocumentClient();
-const dynamo = require('./dynamodb');
+const dynamo = require("./dynamodb");
+
 const sqs = new AWS.SQS();
 
 const putAuction = (title, email, nickname) => {
@@ -26,16 +28,16 @@ const putAuction = (title, email, nickname) => {
     createdAt: now.toISOString(),
     endingAt: endDate.toISOString(),
     highestBid: {
-        amount: 0
+      amount: 0,
     },
     seller: email,
     sellerNickname: nickname,
-  }
+  };
 
   return dynamo
     .put({
       TableName: tableName,
-      Item: auction
+      Item: auction,
     })
     .promise()
     .then(() => auction);
@@ -49,8 +51,10 @@ const deleteAuction = (auctionId) => {
     },
   };
 
-    return dynamo.delete(params).promise()
-        .then(() => auctionId);
+  return dynamo
+    .delete(params)
+    .promise()
+    .then(() => auctionId);
 };
 
 const findAuctionById = (auctionId) => {
@@ -61,53 +65,50 @@ const findAuctionById = (auctionId) => {
     },
   };
 
-    return dynamo
-        .get(params)
-        .promise()
-        .then(({ Item }) => Item);
+  return dynamo
+    .get(params)
+    .promise()
+    .then(({ Item }) => Item);
 };
 
-
-const scanAuctions = (status) => {
-  return dynamo
+const scanAuctions = (status) =>
+  dynamo
     .query({
       TableName: tableName,
-      IndexName: 'statusAndEndDate',
-      KeyConditionExpression: '#status = :status',
+      IndexName: "statusAndEndDate",
+      KeyConditionExpression: "#status = :status",
       ExpressionAttributeValues: {
-        ':status': status,
+        ":status": status,
       },
       ExpressionAttributeNames: {
-        '#status': 'status',
+        "#status": "status",
       },
     })
     .promise()
     .then(({ Items }) => Items);
-};
 
 const addBid = (id, amount, email, nickname) => {
-const params = {
+  const params = {
     TableName: tableName,
     Key: { id },
-    UpdateExpression: 'set highestBid.amount = :amount, highestBid.bidder = :bidder, highestBid.bidderNickname = :bidderNickname',
+    UpdateExpression:
+      "set highestBid.amount = :amount, highestBid.bidder = :bidder, highestBid.bidderNickname = :bidderNickname",
     ExpressionAttributeValues: {
-      ':amount': amount,
-      ':bidder': email,
-      ':bidderNickname': nickname
+      ":amount": amount,
+      ":bidder": email,
+      ":bidderNickname": nickname,
     },
-    ReturnValues: 'ALL_NEW',
-};
-  
-    let updatedAuction;
-    try {
-      const result = dynamo
-        .update(params)
-        .promise();
-        updatedAuction = result.Attributes;
-    } catch (err) {
-        
-    }
-    return updatedAuction
+    ReturnValues: "ALL_NEW",
+  };
+
+  let updatedAuction;
+  try {
+    const result = dynamo.update(params).promise();
+    updatedAuction = result.Attributes;
+  } catch (err) {
+    console.error(err);
+  }
+  return updatedAuction;
 };
 
 const closeAuction = async (auction) => {
@@ -115,71 +116,92 @@ const closeAuction = async (auction) => {
   const { amount, bidder } = highestBid;
 
   if (amount === 0) {
-  const notifySeller = await sqs.sendMessage({
-    QueueUrl: QueueUrl,
-    MessageBody: JSON.stringify({
-      subject: 'No bids on your auction :(',
-      recipient: seller,
-      body: `Your Item ${title} didn't get any bids. Better luck next time`
-    })
-  }).promise();
+    const notifySeller = await sqs
+      .sendMessage({
+        QueueUrl,
+        MessageBody: JSON.stringify({
+          subject: "No bids on your auction :(",
+          recipient: seller,
+          body: `Your Item ${title} didn't get any bids. Better luck next time`,
+        }),
+      })
+      .promise();
     return notifySeller;
   }
 
   const params = {
     TableName: tableName,
     Key: { id },
-    UpdateExpression: 'set #status = :status',
+    UpdateExpression: "set #status = :status",
     ExpressionAttributeValues: {
-      ':status': 'Closed',
+      ":status": "Closed",
     },
     ExpressionAttributeNames: {
-      '#status': 'status',
+      "#status": "status",
     },
   };
 
   await dynamo.update(params).promise();
-  
-  const notifySeller = sqs.sendMessage({
-    QueueUrl: QueueUrl,
-    MessageBody: JSON.stringify({
-      subject: 'Your Item has been sold',
-      recipient: seller,
-      body: `Congratulation. Your Item ${title} has been sold for ${amount} $`
-    })
-  }).promise();
 
-  const notifyBidder = sqs.sendMessage({
-    QueueUrl: QueueUrl,
-    MessageBody: JSON.stringify({
-      subject: 'Your won an auction',
-      recipient: bidder,
-      body: `Congratulation. What a great deal. Your got a ${title} for: ${amount} $`
+  const notifySeller = sqs
+    .sendMessage({
+      QueueUrl,
+      MessageBody: JSON.stringify({
+        subject: "Your Item has been sold",
+        recipient: seller,
+        body: `Congratulation. Your Item ${title} has been sold for ${amount} $`,
+      }),
     })
-  }).promise();
+    .promise();
 
-  return await Promise.all([notifySeller, notifyBidder])
+  const notifyBidder = sqs
+    .sendMessage({
+      QueueUrl,
+      MessageBody: JSON.stringify({
+        subject: "Your won an auction",
+        recipient: bidder,
+        body: `Congratulation. What a great deal. Your got a ${title} for: ${amount} $`,
+      }),
+    })
+    .promise();
+
+  return Promise.all([notifySeller, notifyBidder]);
 };
 
 const getEndedAuctions = async () => {
   const now = new Date();
   const params = {
     TableName: tableName,
-    IndexName: 'statusAndEndDate',
-    KeyConditionExpression: '#status = :status AND endingAt <= :now',
+    IndexName: "statusAndEndDate",
+    KeyConditionExpression: "#status = :status AND endingAt <= :now",
     ExpressionAttributeValues: {
-      ':status': 'Open',
-      ':now': now.toISOString(),
+      ":status": "Open",
+      ":now": now.toISOString(),
     },
     ExpressionAttributeNames: {
-      '#status': 'status',
+      "#status": "status",
     },
   };
 
   const result = await dynamo.query(params).promise();
 
   return result.Items;
-}
+};
+
+const setAuctionPictureUrl = async (id, pictureUrl) => {
+  const params = {
+    TableName: tableName,
+    Key: { id },
+    UpdateExpression: "set pictureUrl = :pictureUrl",
+    ExpressionAttributeValues: {
+      ":pictureUrl": pictureUrl,
+    },
+    ReturnValues: "ALL_NEW",
+  };
+
+  const result = await dynamo.update(params).promise();
+  return result.Attributes;
+};
 
 module.exports = {
   putAuction,
@@ -188,7 +210,6 @@ module.exports = {
   scanAuctions,
   addBid,
   closeAuction,
-  getEndedAuctions
-}
-
-
+  getEndedAuctions,
+  setAuctionPictureUrl,
+};

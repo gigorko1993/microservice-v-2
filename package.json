@@ -7,7 +7,8 @@
   "license": "",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start:local": "ENVIRONMENT=local serverless offline --stage local"
+    "start:local": "ENVIRONMENT=local serverless offline --stage local",
+    "lint": "eslint ."
   },
   "repository": {
     "type": "git",
@@ -35,10 +36,11 @@
     "@middy/http-json-body-parser": "^4.2.4",
     "aws-sdk": "^2.639.0",
     "date-fns": "^2.29.3",
-    "eslint": "^8.34.0",
-    "eslint-config-airbnb": "^19.0.4",
+    "eslint": "^7.29.0",
+    "eslint-config-airbnb": "^18.2.1",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-import": "^2.23.4",
+    "eslint-plugin-jest": "^24.3.6",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-prettier": "^3.4.0",
     "http-errors": "^2.0.0",
