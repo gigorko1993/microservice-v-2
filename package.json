@@ -1,7 +1,7 @@
 {
   "name": "microservice",
   "version": "1.0.0",
-  "description": "Serverless Framework projects",
+  "description": "Serverless Framework projects for auction service",
   "main": "handler.js",
   "author": "Igor Mokhantskyy <gigorko35@gmail.com>",
   "license": "",

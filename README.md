@@ -1,17 +1,34 @@
-# Codingly.io: Base Serverless Framework Template
+Auction service
 
-https://codingly.io
+## Features
 
-## What's included
-* Folder structure used consistently across our projects.
-* [serverless-pseudo-parameters plugin](https://www.npmjs.com/package/serverless-pseudo-parameters): Allows you to take advantage of CloudFormation Pseudo Parameters.
-* [serverless-bundle plugin](https://www.npmjs.com/package/serverless-pseudo-parameters): Bundler based on the serverless-webpack plugin - requires zero configuration and fully compatible with ES6/ES7 features.
+- CRUD for auction
+- place bid feature
+- processing auction with email notification for seller and bidder
+- uploading image for auction
 
 ## Getting started
-```
-sls create --name YOUR_PROJECT_NAME --template-url https://github.com/codingly-io/sls-base
-cd YOUR_PROJECT_NAME
+
+### 1. Install dependencies
+
+```sh
 npm install
 ```
 
-You are ready to go!
+### 2. Deploy the stack
+
+```sh
+sls deploy -v
+```
+
+### 3. Documentation
+
+You can find documentation by link:
+https://docs.google.com/document/d/1i-dIb2B9SPRWd3VidGSEXqZAXRwlvUj1sn4Yn5c4ZVo/edit
+
+<hr/>
+
+## To run serverless locally 
+
+Run `npm run start:local`
+

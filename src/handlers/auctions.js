@@ -41,6 +41,7 @@ const findAuction = (auctionId, callback) => {
       console.log(err);
       callback(null, createResponse(500, "Error on saving auction"));
     });
+  console.log("auction: ", auction);
   if (!auction) {
     throw new Error(`No auction with id: ${auctionId}`);
   }
@@ -59,24 +60,20 @@ const getAuctionsList = async (status, callback) => {
 };
 
 const placeBid = async (auctionId, amount, email, nickname, callback) => {
-  let auction;
-  try {
-    auction = await findAuctionById(auctionId);
-  } catch (err) {
-    console.log(err);
-    callback(
-      null,
-      createResponse(500, "Error on get auction by Id in place bid operation")
-    );
-  }
+  const auction = await findAuctionById(auctionId);
+
+  console.log("auction: ", auction);
 
   // Checking if auction exist
   if (!auction) {
-    callback(null, createResponse(400, `No auction with id: ${auctionId}`));
+    return callback(
+      null,
+      createResponse(400, `No auction with id: ${auctionId}`)
+    );
   }
   // Auction status validation
   if (auction?.status !== "Open") {
-    callback(
+    return callback(
       null,
       createResponse(
         400,
@@ -86,7 +83,7 @@ const placeBid = async (auctionId, amount, email, nickname, callback) => {
   }
   // Bid identity validation
   if (email === auction?.seller) {
-    callback(
+    return callback(
       null,
       createResponse(
         400,
@@ -96,7 +93,7 @@ const placeBid = async (auctionId, amount, email, nickname, callback) => {
   }
   // Avoid double bid
   if (email === auction?.highestBid.bidder) {
-    callback(
+    return callback(
       null,
       createResponse(
         400,
@@ -107,18 +104,21 @@ const placeBid = async (auctionId, amount, email, nickname, callback) => {
 
   // Bid amount validation
   if (amount <= auction?.highestBid?.amount) {
-    callback(
+    return callback(
       null,
       createResponse(
         400,
-        `Your bid must be higher that existing bid: ${auction.highestBid.amount}`
+        `Your bid ${amount} must be higher that existing bid: ${auction.highestBid.amount}`
       )
     );
   }
 
   await addBid(auctionId, amount, email, nickname);
 
-  callback(null, createResponse(204, { auctionId, amount, email, nickname }));
+  return callback(
+    null,
+    createResponse(204, { auctionId, amount, email, nickname })
+  );
 };
 
 const processAuctions = async (_event, _context, callback) => {
