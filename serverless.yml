@@ -1,0 +1,165 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: microservice-pdp
+
+frameworkVersion: '3'
+
+plugins:
+  - serverless-offline
+
+custom:
+  authorizer: arn:aws:lambda:${self:provider.region}:985430231206:function:auth-service-${self:provider.stage}-auth
+  AUCTION_TABLE_NAME: 'Auction-${self:provider.stage}'
+  MailQueue:
+    arn: ${cf:microservice-notification-${self:provider.stage}.MailQueueArn}
+    url: ${cf:microservice-notification-${self:provider.stage}.MailQueueUrl}
+  AuctionsBucket:
+    name: auction-bucket-random123-${self:provider.stage}
+  serverless-offline:
+    host: 0.0.0.0
+    httpPort: 4001
+    lambdaPort: 4003
+
+useDotenv: true
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  region: eu-west-1
+  memorySize: 256
+  stage: ${opt:stage, 'dev'}
+  profile: pdp-auction
+  iam:
+    role:
+      statements:
+        - Effect: 'Allow'
+          Action:
+            - 'dynamodb:Scan'
+            - 'dynamodb:GetItem'
+            - 'dynamodb:PutItem'
+            - 'dynamodb:UpdateItem'
+            - 'dynamodb:DeleteItem'
+            - 'dynamodb:Query'
+          Resource:
+            - 'arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.AUCTION_TABLE_NAME}'
+            - !Join ['/', [ 'arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.AUCTION_TABLE_NAME}', 'index', 'statusAndEndDate' ]]
+        - Effect: 'Allow'
+          Action:
+           - sqs:SendMessage
+          Resource: ${self:custom.MailQueue.arn}
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+          Resource: arn:aws:s3:::${self:custom.AuctionsBucket.name}/*
+functions:
+  createAuction:
+    handler:  handler.createAuctionHandler
+    events:
+      - http:
+          method: POST
+          path: /auction
+          authorizer: ${self:custom.authorizer}
+  deleteAuction:
+    handler:  handler.deleteAuctionHandler
+    events:
+      - http:
+          method: DELETE
+          path: /auction/{auctionId}
+          authorizer: ${self:custom.authorizer}
+  getAuctionById:
+    handler:  handler.findAuctionByIdHandler
+    events:
+      - http:
+          method: GET
+          path: /auction/{auctionId}
+          authorizer: ${self:custom.authorizer}
+  auctionList:
+    handler:  handler.getAuctionsListHandler
+    events:
+      - http:
+          method: GET
+          path: /auctions/{status}
+          authorizer: ${self:custom.authorizer}
+  placeBid:
+    handler:  handler.placeBidHandler
+    events:
+      - http:
+          method: PATCH
+          path: /auction/{auctionId}/bid
+          authorizer: ${self:custom.authorizer}
+  processAuctions:
+    handler: src/handlers/auctions.processAuctions
+    # events:
+    #   - schedule: rate(1 minute)
+
+  uploadAuctionPicture:
+    handler: src/handlers/uploadAuctionPicture.handler
+    events:
+      - http:
+          method: PATCH
+          path: auction/{auctionId}/picture
+          authorizer: ${self:custom.authorizer}
+
+resources:
+  Resources:
+    Auction: 
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.AUCTION_TABLE_NAME}
+        AttributeDefinitions:
+         - AttributeName: id
+           AttributeType: S
+         - AttributeName: status
+           AttributeType: S
+         - AttributeName: endingAt
+           AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: statusAndEndDate
+            KeySchema:
+              - AttributeName: status
+                KeyType: HASH
+              - AttributeName: endingAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              WriteCapacityUnits: 1
+              ReadCapacityUnits: 1
+        ProvisionedThroughput:
+          WriteCapacityUnits: 1
+          ReadCapacityUnits: 1
+    AuctionsBucket: 
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.AuctionsBucket.name}
+        LifecycleConfiguration:
+          Rules:
+          - Id: ExpirePictures
+            Status: Enabled
+            ExpirationInDays: 1
+    AuctionsBucketPolicy: 
+        Type: AWS::S3::BucketPolicy
+        Properties:
+          Bucket: !Ref AuctionsBucket
+          PolicyDocument:
+            Statement:
+              - Sid: PublicRead
+                Effect: Allow
+                Principal: '*'
+                Action:
+                  - s3:GetObject
+                Resource: arn:aws:s3:::${self:custom.AuctionsBucket.name}/*
