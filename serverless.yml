@@ -25,6 +25,11 @@ custom:
     arn: ${cf:microservice-notification-${self:provider.stage}.MailQueueArn}
     url: ${cf:microservice-notification-${self:provider.stage}.MailQueueUrl}
   AuctionsBucket: arn:aws:s3:::auction-bucket-random123-dev
+  DB_USERNAME: ${ssm:/backend/rds/booking/DB_USERNAME}
+  DB_PASSWORD: ${ssm:/backend/rds/booking/DB_PASSWORD~true}
+  DB_DATABASE: ${ssm:/backend/rds/booking/DB_DATABASE}
+  DB_HOST: ${ssm:/backend/rds/booking/DB_HOST}
+  DB_READER_HOST: ${ssm:/backend/rds/booking/DB_READER_HOST}
   serverless-offline:
     host: 0.0.0.0
     httpPort: 4001
@@ -52,10 +57,17 @@ provider:
             - 'dynamodb:Query'
           Resource:
             - 'arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.AUCTION_TABLE_V2_NAME}'
-            - !Join ['/', [ 'arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.AUCTION_TABLE_V2_NAME}', 'index', 'statusAndEndDate' ]]
+            - !Join [
+                '/',
+                [
+                  'arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.AUCTION_TABLE_V2_NAME}',
+                  'index',
+                  'statusAndEndDate',
+                ],
+              ]
         - Effect: 'Allow'
           Action:
-           - sqs:SendMessage
+            - sqs:SendMessage
           Resource: ${self:custom.MailQueue.arn}
         - Effect: Allow
           Action:
@@ -64,35 +76,35 @@ provider:
 
 functions:
   createAuction:
-    handler:  handler.createAuctionHandler
+    handler: handler.createAuctionHandler
     events:
       - http:
           method: POST
           path: /auction
           authorizer: ${self:custom.authorizer}
   deleteAuction:
-    handler:  handler.deleteAuctionHandler
+    handler: handler.deleteAuctionHandler
     events:
       - http:
           method: DELETE
           path: /auction/{auctionId}
           authorizer: ${self:custom.authorizer}
   getAuctionById:
-    handler:  handler.findAuctionByIdHandler
+    handler: handler.findAuctionByIdHandler
     events:
       - http:
           method: GET
           path: /auction/{auctionId}
           authorizer: ${self:custom.authorizer}
   auctionList:
-    handler:  handler.getAuctionsListHandler
+    handler: handler.getAuctionsListHandler
     events:
       - http:
           method: GET
           path: /auctions/{status}
           authorizer: ${self:custom.authorizer}
   placeBid:
-    handler:  handler.placeBidHandler
+    handler: handler.placeBidHandler
     events:
       - http:
           method: PATCH
@@ -113,17 +125,17 @@ functions:
 
 resources:
   Resources:
-    AuctionV2: 
+    AuctionV2:
       Type: AWS::DynamoDB::Table
       Properties:
         TableName: ${self:custom.AUCTION_TABLE_V2_NAME}
         AttributeDefinitions:
-         - AttributeName: id
-           AttributeType: S
-         - AttributeName: status
-           AttributeType: S
-         - AttributeName: endingAt
-           AttributeType: S
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: status
+            AttributeType: S
+          - AttributeName: endingAt
+            AttributeType: S
         KeySchema:
           - AttributeName: id
             KeyType: HASH
