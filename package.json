@@ -1,9 +1,9 @@
 {
-  "name": "microservice",
+  "name": "microservice-v-2",
   "version": "1.0.0",
-  "description": "Serverless Framework projects for auction service",
+  "description": "Serverless Framework projects for auction service with Cognito and RDS",
   "main": "handler.js",
-  "author": "Igor Mokhantskyy <gigorko35@gmail.com>",
+  "author": "Igor Mokhnatskyy <gigorko35@gmail.com>",
   "license": "",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gigorko1993/microservice.git"
+    "url": "git+https://github.com/gigorko1993/microservice-v-2.git"
   },
   "keywords": [
     "serverless",
@@ -22,14 +22,16 @@
     "npm"
   ],
   "bugs": {
-    "url": "https://github.com//gigorko1993/microservice/issues"
+    "url": "https://github.com//gigorko1993/microservice-v-2/issues"
   },
-  "homepage": "https://github.com//gigorko1993/microservice#readme",
+  "homepage": "https://github.com//gigorko1993/microservice-v-2#readme",
   "devDependencies": {
     "lint-staged": "^11.0.0",
+    "serverless": "^3.33.0",
     "serverless-offline": "^12.0.4"
   },
   "dependencies": {
+    "serverless": "^3.33.0",
     "@middy/core": "^4.2.4",
     "@middy/http-error-handler": "^4.2.4",
     "@middy/http-event-normalizer": "^4.2.4",
@@ -46,6 +48,7 @@
     "http-errors": "^2.0.0",
     "lodash": "^4.17.21",
     "query-string": "^7.1.1",
+    "sls": "^0.1.0",
     "uuid": "^9.0.0"
   },
   "lint-staged": {

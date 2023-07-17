@@ -4,7 +4,7 @@ const s3 = new AWS.S3();
 
 const { createResponse } = require("./responseHandler");
 
-const bucketName = "auction-bucket-random123-dev";
+const bucketName = "auction-bucket-random123123-dev";
 const { findAuctionById, setAuctionPictureUrl } = require("./auctionManager");
 
 const handler = async (event) => {
