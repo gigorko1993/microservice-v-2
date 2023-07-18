@@ -6,6 +6,7 @@ let sequelize;
 const loadSequelize = async () => {
   sequelize = new Sequelize(config);
   await sequelize.authenticate();
+  console.log("🚀 ~ file: baseService.js:9 ~ loadSequelize ~ sequelize:", sequelize)
   return sequelize;
 };
 
@@ -26,12 +27,14 @@ const baseService = async (fn) => {
         sequelize.connectionManager,
         "getConnection"
       );
+      console.log("🚀 ~ file: baseService.js:30 ~ baseService ~ getConnectionExists:", getConnectionExists)
       if (getConnectionExists) {
         delete sequelize.connectionManager.getConnection;
       }
     }
 
     const connection = await sequelize.connectionManager.getConnection();
+    console.log("🚀 ~ file: baseService.js:37 ~ baseService ~ connection:", connection)
     await sequelize.connectionManager.releaseConnection(connection);
 
     const { statusCode = 200, body } = await fn(sequelize);

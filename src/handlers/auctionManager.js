@@ -11,7 +11,7 @@ const QueueUrl =
 
 const sqs = new AWS.SQS();
 
-const putAuction = async (title, email, nickname, price, type) => {
+const putAuction = async (title, email, nickname, price, type) => 
   baseService(async sequelize => {
     const now = new Date();
     const endDate = new Date();
@@ -23,24 +23,27 @@ const putAuction = async (title, email, nickname, price, type) => {
       where: { name: type },
       attributes: ["id"],
     });
+    console.log("🚀 ~ file: auctionManager.js:26 ~ putAuction ~ type_id:", type_id)
 
     const auction = {
       title,
       seller: email,
-      sellerNickname: nickname,
+      seller_nickname: nickname,
       status: "Open",
       start: now.toISOString(),
       end: endDate.toISOString(),
       price,
       type_id,
     };
+    console.log("🚀 ~ file: auctionManager.js:38 ~ putAuction ~ auction:", auction)
 
     const createdAuction = await Auction.bulkCreate(auction);
-    return createdAuction;
+    console.log("🚀 ~ file: auctionManager.js:41 ~ putAuction ~ createdAuction:", createdAuction)
+    return {createdAuction, auction};
   });
-};
 
-const deleteAuction = async auctionId => {
+
+const deleteAuction = async auctionId =>
   baseService(async sequelize => {
     const { Auction } = await db(sequelize);
     const auction = await Auction.destroy({
@@ -50,27 +53,26 @@ const deleteAuction = async auctionId => {
     });
     return auction;
   });
-};
 
-const findAuctionById = async auctionId => {
+const findAuctionById = async auctionId => 
   baseService(async sequelize => {
     const { Auction } = await db(sequelize);
 
     const auction = await Auction.findOne({ where: { id: auctionId } });
     return auction;
   });
-};
 
-const scanAuctions = async status => {
+
+const scanAuctions = async status =>
   baseService(async sequelize => {
     const { Auction } = await db(sequelize);
 
     const auctions = await Auction.findAll({ where: { status } });
     return auctions;
   });
-};
 
-const addBid = async (auctionId, amount, email, nickname) => {
+
+const addBid = async (auctionId, amount, email, nickname) =>
   baseService(async sequelize => {
     const { Bidder, Auction } = await db(sequelize);
     const highestBidder = await Bidder.findAll({
@@ -102,9 +104,8 @@ const addBid = async (auctionId, amount, email, nickname) => {
       return result;
     }
   });
-};
 
-const closeAuction = async id => {
+const closeAuction = async id =>
   baseService(async sequelize => {
     const { Bidder, Auction } = await db(sequelize);
 
@@ -159,22 +160,20 @@ const closeAuction = async id => {
 
     return Promise.all([notifySeller, notifyBidder]);
   });
-};
 
-const setAuctionPictureUrl = async (id, pictureUrl) => {
+const setAuctionpicture_url = async (id, picture_url) =>
   baseService(async sequelize => {
     const { Auction } = await db(sequelize);
     const auction = await Auction.update(
       {
-        pictureUrl,
+        picture_url,
       },
       { where: { id } }
     );
     return auction;
   });
-};
 
-const getEndedAuctions = async () => {
+const getEndedAuctions = async () =>
   baseService(async sequelize => {
     const { Auction } = await db(sequelize);
 
@@ -188,7 +187,6 @@ const getEndedAuctions = async () => {
 
     return result;
   });
-};
 
 module.exports = {
   putAuction,
@@ -197,6 +195,6 @@ module.exports = {
   scanAuctions,
   addBid,
   closeAuction,
-  setAuctionPictureUrl,
+  setAuctionpicture_url,
   getEndedAuctions,
 };

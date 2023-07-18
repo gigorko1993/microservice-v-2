@@ -12,14 +12,10 @@ const sendResponse = (statusCode, body) => {
 }
 
 const validateInput = (data) => {
-    const userRoles = ['seller', 'bidder'];
-
     const body = JSON.parse(data);
-    const { email, password, user_role } = body
+    const { email, password } = body
     if (!email || !password || password.length < 6)
         return false
-    if (!user_role || !userRoles.includes(user_role))
-        return false 
     return true
 }
 

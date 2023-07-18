@@ -20,7 +20,6 @@ module.exports = (sequelize, DataTypes) => {
     {
       sequelize,
       tableName: "Bidder",
-      paranoid: true,
       underscored: true,
     }
   );

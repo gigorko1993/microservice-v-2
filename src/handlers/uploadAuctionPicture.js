@@ -5,7 +5,7 @@ const s3 = new AWS.S3();
 const { createResponse } = require("./responseHandler");
 
 const bucketName = "auction-bucket-random123-dev";
-const { findAuctionById, setAuctionPictureUrl } = require("./auctionManager");
+const { findAuctionById, setAuctionpicture_url } = require("./auctionManager");
 
 const handler = async (event) => {
   const { auctionId } = event.pathParameters;
@@ -30,7 +30,7 @@ const handler = async (event) => {
       })
       .promise();
     console.log("Upload to S3 result: ", result.Location);
-    const updatedAuction = await setAuctionPictureUrl(
+    const updatedAuction = await setAuctionpicture_url(
       auction.id,
       result.Location
     );

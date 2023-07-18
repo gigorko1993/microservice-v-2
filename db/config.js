@@ -1,23 +1,26 @@
 require('dotenv').config();
 
 const config = {
-    username: process.env.DB_USERNAME,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_DATABASE,
-    host: process.env.DB_HOST,
+
+    username: 'admin',
+    password: 'passwordDB123',
+    database: 'rds_auction_1',
+    host: 'database-auction-1.c985lf9meort.eu-west-1.rds.amazonaws.com',
+    port: 3307,
+    logging: console.log,
     replication: {
       read: [
         {
-          host: process.env.DB_HOST,
+          host: 'database-auction-1.c985lf9meort.eu-west-1.rds.amazonaws.com',
         },
       ],
       write: {
-        host: process.env.DB_HOST,
+        host: 'database-auction-1.c985lf9meort.eu-west-1.rds.amazonaws.com',
       },
     },
     dialect: 'mysql',
     dialectOptions: {
-      connectTimeout: 60000,
+      connectTimeout: 30000,
     },
     pool: {
       max: 1, // maximum number of connections, 1 connection is needed per lambda (no concurrent queries happening)

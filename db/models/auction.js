@@ -9,14 +9,13 @@ module.exports = (sequelize, DataTypes) => {
       // define association here
       Auction.belongsTo(models.Type);
       Auction.hasMany(models.Bidder);
-      Auction.hasOne(models.Seller);
     }
   }
   Auction.init(
     {
       title: DataTypes.STRING,
       seller: DataTypes.STRING,
-      sellerNickname: DataTypes.STRING,
+      seller_nickname: DataTypes.STRING,
       start: DataTypes.DATE,
       end: DataTypes.DATE,
       price: DataTypes.INTEGER,
@@ -25,12 +24,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.ENUM("active", "closed"),
         defaultValue: "active",
       },
-      pictureUrl: { type: DataTypes.STRING, defaultValue: null },
+      picture_url: { type: DataTypes.STRING, defaultValue: null },
     },
     {
       sequelize,
       tableName: "Auction",
-      paranoid: true,
       underscored: true,
     }
   );

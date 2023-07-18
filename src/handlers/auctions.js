@@ -8,16 +8,59 @@ const {
   getEndedAuctions,
 } = require("./auctionManager");
 const { createResponse } = require("./responseHandler");
+const baseService = require("../helpers/baseService");
+const { db } = require("../helpers/db");
 
-const createAuction = async (title, email, nickname, price, type, callback) => {
-  try {
-    const create = await putAuction(title, email, nickname, price, type);
-    callback(null, createResponse(200, create));
-  } catch (err) {
-    console.log(err);
-    callback(null, createResponse(500, "Error on saving auction"));
-  }
-};
+const createAuction = async event =>
+  baseService(async sequelize => {
+    const { title, price, type } = JSON.parse(event.body);
+
+    const { email } = event.requestContext.authorizer.claims;
+    console.log("🚀 ~ file: auctions.js:19 ~ email:", email);
+
+    const now = new Date();
+    const endDate = new Date();
+    endDate.setHours(now.getHours() + 1);
+
+    try {
+      const { Auction, Type } = await db(sequelize);
+
+      const { id: type_id } = await Type.findOne({
+        where: { name: type },
+        attributes: ["id"],
+      });
+      console.log(
+        "🚀 ~ file: auctionManager.js:26 ~ putAuction ~ type_id:",
+        type_id
+      );
+
+      const auction = {
+        title,
+        seller: email,
+        seller_nickname: email,
+        start: now.toISOString(),
+        end: endDate.toISOString(),
+        price,
+        type_id,
+        status: "Open",
+        picture_url: null,
+      };
+      console.log(
+        "🚀 ~ file: auctionManager.js:38 ~ putAuction ~ auction:",
+        auction
+      );
+
+      const res = await Auction.create({...auction});
+      console.log("🚀 ~ file: auctions.js:60 ~ res:", res)
+      return {
+        body: res,
+      };
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
+  });
+
 const deleteAuctionById = (auctionId, callback) => {
   deleteAuction(auctionId)
     .then(res => {

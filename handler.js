@@ -7,22 +7,23 @@ const {
 } = require("./src/handlers/auctions");
 const { createResponse } = require("./src/handlers/responseHandler");
 
-const createAuctionHandler = (event, context, callback) => {
-  if (event.httpMethod === "POST") {
-    const { title, price, type } = JSON.parse(event.body);
+// const createAuctionHandler = async (event, context, callback) => {
+//   if (event.httpMethod === "POST") {
+//     const { title, price, type } = JSON.parse(event.body);
 
 
-    const authorizer = event.requestContext;
-    console.log("🚀 ~ file: handler.js:15 ~ createAuctionHandler ~ authorizer:", authorizer)
-    const authorizer2 = event.requestContext.authorizer;
-    console.log("🚀 ~ file: handler.js:17 ~ createAuctionHandler ~ authorizer2:", authorizer2)
-    const { email, email: nickname } = event.requestContext.authorizer.claims;
+//     const authorizer = event.requestContext;
+//     console.log("🚀 ~ file: handler.js:15 ~ createAuctionHandler ~ authorizer:", authorizer)
+//     const authorizer2 = event.requestContext.authorizer;
+//     console.log("🚀 ~ file: handler.js:17 ~ createAuctionHandler ~ authorizer2:", authorizer2)
+//     const { email } = event.requestContext.authorizer.claims;
 
-    createAuction(title, email, nickname, price, type, callback);
-  } else {
-    callback(null, createResponse(404, "Error on hello"));
-  }
-};
+//     createAuction(title, email, email, price, type, callback);
+//   } else {
+//     callback(null, createResponse(404, "Error on hello"));
+//   }
+// };
+const createAuctionHandler = async (event) => createAuction(event);
 const deleteAuctionHandler = (event, context, callback) => {
   if (event.httpMethod === "DELETE") {
     const { auctionId } = event.pathParameters;
