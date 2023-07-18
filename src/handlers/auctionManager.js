@@ -1,206 +1,193 @@
 const AWS = require("aws-sdk");
-// const { createResponse } = require('./responseHandler');
-const { v4: uuid } = require("uuid");
-// const { middy } = require('@middy/core');
-// const { httpJsonBodyParser } = require('@middy/http-json-body-parser')
-// const { httpEventNormalizer } = require('@middy/http-event-normalizer')
-// const { httpErrorHandler } = require('@middy/http-error-handler') 29 video
+const { Op } = require("sequelize");
+const baseService = require("../helpers/baseService");
+const { db } = require("../helpers/db");
+
 const name = process.env.AUCTION_TABLE_V2_NAME || "Auction";
 const stage = process.env.stage || "dev";
 const tableName = `${name}-${stage}`;
 const QueueUrl =
   "https://sqs.eu-west-1.amazonaws.com/985430231206/MailQueue-dev";
 
-// const dynamo = new AWS.DynamoDB.DocumentClient();
-const dynamo = require("./dynamodb");
-
 const sqs = new AWS.SQS();
 
-const putAuction = (title, email, nickname) => {
-  const now = new Date();
-  const endDate = new Date();
-  endDate.setHours(now.getHours() + 1);
+const putAuction = async (title, email, nickname, price, type) => {
+  baseService(async sequelize => {
+    const now = new Date();
+    const endDate = new Date();
+    endDate.setHours(now.getHours() + 1);
 
-  const auction = {
-    id: uuid(),
-    title,
-    status: "Open",
-    createdAt: now.toISOString(),
-    endingAt: endDate.toISOString(),
-    highestBid: {
-      amount: 0,
-    },
-    seller: email,
-    sellerNickname: nickname,
-  };
+    const { Auction, Type } = await db(sequelize);
 
-  return dynamo
-    .put({
-      TableName: tableName,
-      Item: auction,
-    })
-    .promise()
-    .then(() => auction);
+    const { id: type_id } = await Type.findOne({
+      where: { name: type },
+      attributes: ["id"],
+    });
+
+    const auction = {
+      title,
+      seller: email,
+      sellerNickname: nickname,
+      status: "Open",
+      start: now.toISOString(),
+      end: endDate.toISOString(),
+      price,
+      type_id,
+    };
+
+    const createdAuction = await Auction.bulkCreate(auction);
+    return createdAuction;
+  });
 };
 
-const deleteAuction = (auctionId) => {
-  const params = {
-    TableName: tableName,
-    Key: {
-      id: auctionId,
-    },
-  };
-
-  return dynamo
-    .delete(params)
-    .promise()
-    .then(() => auctionId);
-};
-
-const findAuctionById = (auctionId) => {
-  const params = {
-    TableName: tableName,
-    Key: {
-      id: auctionId,
-    },
-  };
-
-  return dynamo
-    .get(params)
-    .promise()
-    .then(({ Item }) => Item);
-};
-
-const scanAuctions = (status) =>
-  dynamo
-    .query({
-      TableName: tableName,
-      IndexName: "statusAndEndDate",
-      KeyConditionExpression: "#status = :status",
-      ExpressionAttributeValues: {
-        ":status": status,
+const deleteAuction = async auctionId => {
+  baseService(async sequelize => {
+    const { Auction } = await db(sequelize);
+    const auction = await Auction.destroy({
+      where: {
+        id: auctionId,
       },
-      ExpressionAttributeNames: {
-        "#status": "status",
-      },
-    })
-    .promise()
-    .then(({ Items }) => Items);
-
-const addBid = (id, amount, email, nickname) => {
-  const params = {
-    TableName: tableName,
-    Key: { id },
-    UpdateExpression:
-      "set highestBid.amount = :amount, highestBid.bidder = :bidder, highestBid.bidderNickname = :bidderNickname",
-    ExpressionAttributeValues: {
-      ":amount": amount,
-      ":bidder": email,
-      ":bidderNickname": nickname,
-    },
-    ReturnValues: "ALL_NEW",
-  };
-
-  let updatedAuction;
-  try {
-    const result = dynamo.update(params).promise();
-    updatedAuction = result.Attributes;
-  } catch (err) {
-    console.error(err);
-  }
-  return updatedAuction;
+    });
+    return auction;
+  });
 };
 
-const closeAuction = async (auction) => {
-  const { id, title, seller, highestBid } = auction;
-  const { amount, bidder } = highestBid;
+const findAuctionById = async auctionId => {
+  baseService(async sequelize => {
+    const { Auction } = await db(sequelize);
 
-  if (amount === 0) {
-    const notifySeller = await sqs
+    const auction = await Auction.findOne({ where: { id: auctionId } });
+    return auction;
+  });
+};
+
+const scanAuctions = async status => {
+  baseService(async sequelize => {
+    const { Auction } = await db(sequelize);
+
+    const auctions = await Auction.findAll({ where: { status } });
+    return auctions;
+  });
+};
+
+const addBid = async (auctionId, amount, email, nickname) => {
+  baseService(async sequelize => {
+    const { Bidder, Auction } = await db(sequelize);
+    const highestBidder = await Bidder.findAll({
+      include: [{ model: Auction, where: id }],
+      order: [["amount", "DESC"]],
+      limit: 1,
+    });
+
+    if (highestBidder && highestBidder.email === email) {
+      return highestBidder;
+    }
+
+    const bidderExist = await Bidder.findOne({
+      where: { auction_id, email, nickname },
+    });
+    if (bidderExist) {
+      const updateBidder = await bidderExist.update({
+        bid,
+      });
+      return updateBidder;
+    } else {
+      const bidderInfo = {
+        email,
+        nickname,
+        bid: amount,
+        auction_id: auctionId,
+      };
+      const result = await Bidder.bulkCreate(bidderInfo);
+      return result;
+    }
+  });
+};
+
+const closeAuction = async id => {
+  baseService(async sequelize => {
+    const { Bidder, Auction } = await db(sequelize);
+
+    const bidderExist = await Bidder.findAll({
+      include: [{ model: Auction, where: id }],
+      order: [["bid", "DESC"]],
+      limit: 1,
+    });
+
+    if (bidderExist && bidderExist.bid === 0) {
+      const notifySeller = await sqs
+        .sendMessage({
+          QueueUrl,
+          MessageBody: JSON.stringify({
+            subject: "No bids on your auction :(",
+            recipient: bidderExist.Auction.seller,
+            body: `Your Item ${title} didn't get any bids. Better luck next time`,
+          }),
+        })
+        .promise();
+      return notifySeller;
+    }
+
+    await Auction.update(
+      {
+        status: "Closed",
+      },
+      { where: { id } }
+    );
+
+    const notifySeller = sqs
       .sendMessage({
         QueueUrl,
         MessageBody: JSON.stringify({
-          subject: "No bids on your auction :(",
-          recipient: seller,
-          body: `Your Item ${title} didn't get any bids. Better luck next time`,
+          subject: "Your Item has been sold",
+          recipient: bidderExist.Auction.seller,
+          body: `Congratulation. Your Item ${bidderExist.Auction.title} has been sold for ${bidderExist.bid} $`,
         }),
       })
       .promise();
-    return notifySeller;
-  }
 
-  const params = {
-    TableName: tableName,
-    Key: { id },
-    UpdateExpression: "set #status = :status",
-    ExpressionAttributeValues: {
-      ":status": "Closed",
-    },
-    ExpressionAttributeNames: {
-      "#status": "status",
-    },
-  };
+    const notifyBidder = sqs
+      .sendMessage({
+        QueueUrl,
+        MessageBody: JSON.stringify({
+          subject: "Your won an auction",
+          recipient: bidderExist.email,
+          body: `Congratulation. What a great deal. Your got a ${bidderExist.Auction.title} for: ${bidderExist.amount} $`,
+        }),
+      })
+      .promise();
 
-  await dynamo.update(params).promise();
-
-  const notifySeller = sqs
-    .sendMessage({
-      QueueUrl,
-      MessageBody: JSON.stringify({
-        subject: "Your Item has been sold",
-        recipient: seller,
-        body: `Congratulation. Your Item ${title} has been sold for ${amount} $`,
-      }),
-    })
-    .promise();
-
-  const notifyBidder = sqs
-    .sendMessage({
-      QueueUrl,
-      MessageBody: JSON.stringify({
-        subject: "Your won an auction",
-        recipient: bidder,
-        body: `Congratulation. What a great deal. Your got a ${title} for: ${amount} $`,
-      }),
-    })
-    .promise();
-
-  return Promise.all([notifySeller, notifyBidder]);
-};
-
-const getEndedAuctions = async () => {
-  const now = new Date();
-  const params = {
-    TableName: tableName,
-    IndexName: "statusAndEndDate",
-    KeyConditionExpression: "#status = :status AND endingAt <= :now",
-    ExpressionAttributeValues: {
-      ":status": "Open",
-      ":now": now.toISOString(),
-    },
-    ExpressionAttributeNames: {
-      "#status": "status",
-    },
-  };
-
-  const result = await dynamo.query(params).promise();
-
-  return result.Items;
+    return Promise.all([notifySeller, notifyBidder]);
+  });
 };
 
 const setAuctionPictureUrl = async (id, pictureUrl) => {
-  const params = {
-    TableName: tableName,
-    Key: { id },
-    UpdateExpression: "set pictureUrl = :pictureUrl",
-    ExpressionAttributeValues: {
-      ":pictureUrl": pictureUrl,
-    },
-    ReturnValues: "ALL_NEW",
-  };
+  baseService(async sequelize => {
+    const { Auction } = await db(sequelize);
+    const auction = await Auction.update(
+      {
+        pictureUrl,
+      },
+      { where: { id } }
+    );
+    return auction;
+  });
+};
 
-  const result = await dynamo.update(params).promise();
-  return result.Attributes;
+const getEndedAuctions = async () => {
+  baseService(async sequelize => {
+    const { Auction } = await db(sequelize);
+
+    const now = new Date();
+    const where = {
+      status: "Open",
+      end: { [Op.lte]: now },
+    };
+
+    const result = await Auction.findAll(where).promise();
+
+    return result;
+  });
 };
 
 module.exports = {
@@ -210,6 +197,6 @@ module.exports = {
   scanAuctions,
   addBid,
   closeAuction,
-  getEndedAuctions,
   setAuctionPictureUrl,
+  getEndedAuctions,
 };

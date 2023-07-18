@@ -1,5 +1,5 @@
-module.exports = (sequelize) => {
-  class BoxBooking extends sequelize.Sequelize.Model {
+module.exports = (sequelize, DataTypes) => {
+  class Type extends sequelize.Sequelize.Model {
     /**
      * Helper method for defining associations.
      * This method is not a part of Sequelize lifecycle.
@@ -7,17 +7,19 @@ module.exports = (sequelize) => {
      */
     static associate(models) {
       // define association here
-      BoxBooking.belongsTo(models.Booking);
-      BoxBooking.belongsTo(models.Box);
+      Type.hasMany(models.Auction);
     }
   }
-  BoxBooking.init(
-    {},
+  Type.init(
+    {
+      name: DataTypes.STRING,
+    },
     {
       sequelize,
-      tableName: "box_booking",
+      tableName: "Type",
+      paranoid: true,
       underscored: true,
     }
   );
-  return BoxBooking;
+  return Type;
 };

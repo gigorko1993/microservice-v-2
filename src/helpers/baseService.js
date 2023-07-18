@@ -1,10 +1,10 @@
 const { Sequelize } = require("sequelize");
-const config = require("../../db/config");
+const {config} = require("../../db/config");
 
 let sequelize;
 
 const loadSequelize = async () => {
-  sequelize = new Sequelize(config.development);
+  sequelize = new Sequelize(config);
   await sequelize.authenticate();
   return sequelize;
 };
@@ -18,14 +18,10 @@ const headers = {
 
 const baseService = async (fn) => {
   try {
-    // re-use the sequelize instance across invocations to improve performance
     if (!sequelize) {
       sequelize = await loadSequelize();
     } else {
-      // restart connection pool to ensure connections are not re-used across invocations
       sequelize.connectionManager.initPools();
-
-      // restore `getConnection()` if it has been overwritten by `close()`
       const getConnectionExists = Object.prototype.hasOwnProperty.call(
         sequelize.connectionManager,
         "getConnection"
@@ -39,7 +35,8 @@ const baseService = async (fn) => {
     await sequelize.connectionManager.releaseConnection(connection);
 
     const { statusCode = 200, body } = await fn(sequelize);
-
+    console.log("[baseService] Function executed!");
+    console.log({ statusCode }, body);
     return Promise.resolve({
       statusCode,
       headers,
@@ -56,8 +53,6 @@ const baseService = async (fn) => {
       }),
     });
   } finally {
-    // close any opened connections during the invocation
-    // this will wait for any in-progress queries to finish before closing the connections
     await sequelize.connectionManager.close();
   }
 };

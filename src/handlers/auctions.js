@@ -9,35 +9,33 @@ const {
 } = require("./auctionManager");
 const { createResponse } = require("./responseHandler");
 
-const createAuction = (title, email, nickname, callback) => {
-  putAuction(title, email, nickname)
-    .then((res) => {
-      console.log("response: ", res);
-      callback(null, createResponse(200, res));
-    })
-    .catch((err) => {
-      console.log(err);
-      callback(null, createResponse(500, "Error on saving auction"));
-    });
+const createAuction = async (title, email, nickname, price, type, callback) => {
+  try {
+    const create = await putAuction(title, email, nickname, price, type);
+    callback(null, createResponse(200, create));
+  } catch (err) {
+    console.log(err);
+    callback(null, createResponse(500, "Error on saving auction"));
+  }
 };
 const deleteAuctionById = (auctionId, callback) => {
   deleteAuction(auctionId)
-    .then((res) => {
+    .then(res => {
       console.log("response: ", res);
       callback(null, createResponse(200, res));
     })
-    .catch((err) => {
+    .catch(err => {
       console.log(err);
       callback(null, createResponse(500, "Error on saving auction"));
     });
 };
 const findAuction = (auctionId, callback) => {
   const auction = findAuctionById(auctionId)
-    .then((res) => {
+    .then(res => {
       console.log("response: ", res);
       callback(null, createResponse(200, res));
     })
-    .catch((err) => {
+    .catch(err => {
       console.log(err);
       callback(null, createResponse(500, "Error on saving auction"));
     });
@@ -49,11 +47,11 @@ const findAuction = (auctionId, callback) => {
 
 const getAuctionsList = async (status, callback) => {
   await scanAuctions(status)
-    .then((res) => {
+    .then(res => {
       console.log("response: ", res);
       callback(null, createResponse(200, res));
     })
-    .catch((err) => {
+    .catch(err => {
       console.log(err);
       callback(null, createResponse(500, "Error on get auction list"));
     });
@@ -91,27 +89,6 @@ const placeBid = async (auctionId, amount, email, nickname, callback) => {
       )
     );
   }
-  // Avoid double bid
-  if (email === auction?.highestBid.bidder) {
-    return callback(
-      null,
-      createResponse(
-        400,
-        `User with email: ${email} already place bid for auction`
-      )
-    );
-  }
-
-  // Bid amount validation
-  if (amount <= auction?.highestBid?.amount) {
-    return callback(
-      null,
-      createResponse(
-        400,
-        `Your bid ${amount} must be higher that existing bid: ${auction.highestBid.amount}`
-      )
-    );
-  }
 
   await addBid(auctionId, amount, email, nickname);
 
@@ -128,7 +105,7 @@ const processAuctions = async (_event, _context, callback) => {
 
     if (auctionsToClose.length) {
       const closePromises = await Promise.all(
-        auctionsToClose.map((auction) => closeAuction(auction))
+        auctionsToClose.map(({ id }) => closeAuction(id))
       );
 
       console.log("closePromises: ", closePromises);

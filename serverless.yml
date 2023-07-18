@@ -15,21 +15,19 @@ service: microservice-pdp-v-2
 
 frameworkVersion: '3'
 
-# plugins:
-#   - serverless-offline
+plugins:
+  - serverless-offline
 
 custom:
-  authorizer: arn:aws:lambda:${self:provider.region}:985430231206:function:auth-service-cognito-${self:provider.stage}-login
-  AUCTION_TABLE_V2_NAME: 'Auction-V2-${self:provider.stage}'
+  # authorizer: arn:aws:lambda:${self:provider.region}:985430231206:function:auth-service-cognito-${self:provider.stage}-login
   MailQueue:
     arn: ${cf:microservice-notification-${self:provider.stage}.MailQueueArn}
     url: ${cf:microservice-notification-${self:provider.stage}.MailQueueUrl}
   AuctionsBucket: arn:aws:s3:::auction-bucket-random123-dev
-  DB_USERNAME: ${ssm:/backend/rds/booking/DB_USERNAME}
-  DB_PASSWORD: ${ssm:/backend/rds/booking/DB_PASSWORD~true}
-  DB_DATABASE: ${ssm:/backend/rds/booking/DB_DATABASE}
-  DB_HOST: ${ssm:/backend/rds/booking/DB_HOST}
-  DB_READER_HOST: ${ssm:/backend/rds/booking/DB_READER_HOST}
+  DB_USERNAME: 'admin'
+  DB_PASSWORD: 'passwordDB123'
+  DB_DATABASE: 'database-auction-1'
+  DB_HOST: 'database-auction-1.c985lf9meort.eu-west-1.rds.amazonaws.com'
   serverless-offline:
     host: 0.0.0.0
     httpPort: 4001
@@ -44,27 +42,12 @@ provider:
   memorySize: 256
   stage: ${opt:stage, 'dev'}
   profile: pdp-auction
+  environment:
+    user_pool_id: { Ref: UserPool }
+    client_id: { Ref: UserClient }
   iam:
     role:
       statements:
-        - Effect: 'Allow'
-          Action:
-            - 'dynamodb:Scan'
-            - 'dynamodb:GetItem'
-            - 'dynamodb:PutItem'
-            - 'dynamodb:UpdateItem'
-            - 'dynamodb:DeleteItem'
-            - 'dynamodb:Query'
-          Resource:
-            - 'arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.AUCTION_TABLE_V2_NAME}'
-            - !Join [
-                '/',
-                [
-                  'arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.AUCTION_TABLE_V2_NAME}',
-                  'index',
-                  'statusAndEndDate',
-                ],
-              ]
         - Effect: 'Allow'
           Action:
             - sqs:SendMessage
@@ -73,43 +56,128 @@ provider:
           Action:
             - s3:PutObject
           Resource: arn:aws:s3:::auction-bucket-random123-dev/*
-
+        - Effect: Allow
+          Action:
+            - cognito-idp:AdminInitiateAuth
+            - cognito-idp:AdminCreateUser
+            - cognito-idp:AdminSetUserPassword
+          Resource: "*"
 functions:
+  login:
+    handler: src/auth-handlers/login.handler
+    events:
+      - http:
+          path: user/login
+          method: post
+          cors: true
+  signup:
+    handler: src/auth-handlers/signup.handler
+    events:
+      - http:
+          path:  user/signup
+          method: post
+          cors: true
+
+  privateEndpoint:
+    handler:  src/auth-handlers/private.handler
+    events:
+      - http:
+          path: user/private
+          method: post
+          cors: true
+          authorizer:
+            name: PrivateAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - UserPool
+                - Arn
+            claims:
+              - email
+  publicEndpoint:
+    handler: src/auth-handlers/public.handler
+    events:
+      - http:
+          path: public
+          method: POST
+          cors: true
+
   createAuction:
     handler: handler.createAuctionHandler
     events:
       - http:
           method: POST
           path: /auction
-          authorizer: ${self:custom.authorizer}
+          # authorizer: ${self:custom.authorizer}
+          authorizer:
+            name: PrivateAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - UserPool
+                - Arn
+            claims:
+              - email
   deleteAuction:
     handler: handler.deleteAuctionHandler
     events:
       - http:
           method: DELETE
           path: /auction/{auctionId}
-          authorizer: ${self:custom.authorizer}
+          authorizer:
+            name: PrivateAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - UserPool
+                - Arn
+            claims:
+              - email
   getAuctionById:
     handler: handler.findAuctionByIdHandler
     events:
       - http:
           method: GET
           path: /auction/{auctionId}
-          authorizer: ${self:custom.authorizer}
+          authorizer:
+            name: PrivateAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - UserPool
+                - Arn
+            claims:
+              - email
   auctionList:
     handler: handler.getAuctionsListHandler
     events:
       - http:
           method: GET
           path: /auctions/{status}
-          authorizer: ${self:custom.authorizer}
+          authorizer:
+            name: PrivateAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - UserPool
+                - Arn
+            claims:
+              - email
   placeBid:
     handler: handler.placeBidHandler
     events:
       - http:
           method: PATCH
           path: /auction/{auctionId}/bid
-          authorizer: ${self:custom.authorizer}
+          authorizer:
+            name: PrivateAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - UserPool
+                - Arn
+            claims:
+              - email
   processAuctions:
     handler: src/handlers/auctions.processAuctions
     # events:
@@ -121,36 +189,59 @@ functions:
       - http:
           method: PATCH
           path: auction/{auctionId}/picture
-          authorizer: ${self:custom.authorizer}
-
+          authorizer:
+            name: PrivateAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - UserPool
+                - Arn
+            claims:
+              - email
 resources:
   Resources:
-    AuctionV2:
-      Type: AWS::DynamoDB::Table
+    # This response is needed for custom authorizer failures cors support ¯\_(ツ)_/¯
+    GatewayResponse:
+      Type: 'AWS::ApiGateway::GatewayResponse'
       Properties:
-        TableName: ${self:custom.AUCTION_TABLE_V2_NAME}
-        AttributeDefinitions:
-          - AttributeName: id
-            AttributeType: S
-          - AttributeName: status
-            AttributeType: S
-          - AttributeName: endingAt
-            AttributeType: S
-        KeySchema:
-          - AttributeName: id
-            KeyType: HASH
-        GlobalSecondaryIndexes:
-          - IndexName: statusAndEndDate
-            KeySchema:
-              - AttributeName: status
-                KeyType: HASH
-              - AttributeName: endingAt
-                KeyType: RANGE
-            Projection:
-              ProjectionType: ALL
-            ProvisionedThroughput:
-              WriteCapacityUnits: 1
-              ReadCapacityUnits: 1
-        ProvisionedThroughput:
-          WriteCapacityUnits: 1
-          ReadCapacityUnits: 1
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: EXPIRED_TOKEN
+        RestApiId:
+          Ref: 'ApiGatewayRestApi'
+        StatusCode: '401'
+    AuthFailureGatewayResponse:
+      Type: 'AWS::ApiGateway::GatewayResponse'
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: UNAUTHORIZED
+        RestApiId:
+          Ref: 'ApiGatewayRestApi'
+        StatusCode: '401'
+    # This resources for AWS cognito pools
+    UserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: serverless-auth-pool
+        Schema:
+          - Name: email
+            Required: true
+            Mutable: true
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 6
+        AutoVerifiedAttributes: ["email"]
+
+    UserClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: auction-user-pool
+        GenerateSecret: false
+        UserPoolId: { Ref: UserPool }
+        AccessTokenValidity: 5
+        IdTokenValidity: 5
+        ExplicitAuthFlows:
+          - "ADMIN_NO_SRP_AUTH"

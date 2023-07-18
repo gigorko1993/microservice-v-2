@@ -1,5 +1,5 @@
 module.exports = (sequelize, DataTypes) => {
-  class Box extends sequelize.Sequelize.Model {
+  class Bidder extends sequelize.Sequelize.Model {
     /**
      * Helper method for defining associations.
      * This method is not a part of Sequelize lifecycle.
@@ -7,21 +7,22 @@ module.exports = (sequelize, DataTypes) => {
      */
     static associate(models) {
       // define association here
-      Box.belongsTo(models.Venue);
-      Box.belongsTo(models.BoxSection);
-      Box.hasMany(models.BoxBooking);
-      Box.hasMany(models.BoxSlot);
+      Bidder.belongsTo(models.Auction);
     }
   }
-  Box.init(
+  Bidder.init(
     {
-      name: DataTypes.STRING,
+      email: DataTypes.STRING,
+      nickname: DataTypes.STRING,
+      bid: DataTypes.INTEGER,
+      auction_id: DataTypes.INTEGER,
     },
     {
       sequelize,
-      tableName: "box",
+      tableName: "Bidder",
+      paranoid: true,
       underscored: true,
     }
   );
-  return Box;
+  return Bidder;
 };
