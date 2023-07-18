@@ -3,107 +3,10 @@ const { Op } = require("sequelize");
 const baseService = require("../helpers/baseService");
 const { db } = require("../helpers/db");
 
-const name = process.env.AUCTION_TABLE_V2_NAME || "Auction";
-const stage = process.env.stage || "dev";
-const tableName = `${name}-${stage}`;
 const QueueUrl =
   "https://sqs.eu-west-1.amazonaws.com/985430231206/MailQueue-dev";
 
 const sqs = new AWS.SQS();
-
-const putAuction = async (title, email, nickname, price, type) => 
-  baseService(async sequelize => {
-    const now = new Date();
-    const endDate = new Date();
-    endDate.setHours(now.getHours() + 1);
-
-    const { Auction, Type } = await db(sequelize);
-
-    const { id: type_id } = await Type.findOne({
-      where: { name: type },
-      attributes: ["id"],
-    });
-    console.log("🚀 ~ file: auctionManager.js:26 ~ putAuction ~ type_id:", type_id)
-
-    const auction = {
-      title,
-      seller: email,
-      seller_nickname: nickname,
-      status: "Open",
-      start: now.toISOString(),
-      end: endDate.toISOString(),
-      price,
-      type_id,
-    };
-    console.log("🚀 ~ file: auctionManager.js:38 ~ putAuction ~ auction:", auction)
-
-    const createdAuction = await Auction.bulkCreate(auction);
-    console.log("🚀 ~ file: auctionManager.js:41 ~ putAuction ~ createdAuction:", createdAuction)
-    return {createdAuction, auction};
-  });
-
-
-const deleteAuction = async auctionId =>
-  baseService(async sequelize => {
-    const { Auction } = await db(sequelize);
-    const auction = await Auction.destroy({
-      where: {
-        id: auctionId,
-      },
-    });
-    return auction;
-  });
-
-const findAuctionById = async auctionId => 
-  baseService(async sequelize => {
-    const { Auction } = await db(sequelize);
-
-    const auction = await Auction.findOne({ where: { id: auctionId } });
-    return auction;
-  });
-
-
-const scanAuctions = async status =>
-  baseService(async sequelize => {
-    const { Auction } = await db(sequelize);
-
-    const auctions = await Auction.findAll({ where: { status } });
-    return auctions;
-  });
-
-
-const addBid = async (auctionId, amount, email, nickname) =>
-  baseService(async sequelize => {
-    const { Bidder, Auction } = await db(sequelize);
-    const highestBidder = await Bidder.findAll({
-      include: [{ model: Auction, where: id }],
-      order: [["amount", "DESC"]],
-      limit: 1,
-    });
-
-    if (highestBidder && highestBidder.email === email) {
-      return highestBidder;
-    }
-
-    const bidderExist = await Bidder.findOne({
-      where: { auction_id, email, nickname },
-    });
-    if (bidderExist) {
-      const updateBidder = await bidderExist.update({
-        bid,
-      });
-      return updateBidder;
-    } else {
-      const bidderInfo = {
-        email,
-        nickname,
-        bid: amount,
-        auction_id: auctionId,
-      };
-      const result = await Bidder.bulkCreate(bidderInfo);
-      return result;
-    }
-  });
 
 const closeAuction = async id =>
   baseService(async sequelize => {
@@ -161,7 +64,7 @@ const closeAuction = async id =>
     return Promise.all([notifySeller, notifyBidder]);
   });
 
-const setAuctionpicture_url = async (id, picture_url) =>
+const setAuctionPictureUrl = async (id, picture_url) =>
   baseService(async sequelize => {
     const { Auction } = await db(sequelize);
     const auction = await Auction.update(
@@ -189,12 +92,7 @@ const getEndedAuctions = async () =>
   });
 
 module.exports = {
-  putAuction,
-  deleteAuction,
-  findAuctionById,
-  scanAuctions,
-  addBid,
   closeAuction,
-  setAuctionpicture_url,
+  setAuctionPictureUrl,
   getEndedAuctions,
 };

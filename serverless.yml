@@ -19,7 +19,6 @@ plugins:
   - serverless-offline
 
 custom:
-  # authorizer: arn:aws:lambda:${self:provider.region}:985430231206:function:auth-service-cognito-${self:provider.stage}-login
   MailQueue:
     arn: ${cf:microservice-notification-${self:provider.stage}.MailQueueArn}
     url: ${cf:microservice-notification-${self:provider.stage}.MailQueueUrl}
@@ -104,6 +103,7 @@ functions:
 
   createAuction:
     handler: handler.createAuctionHandler
+    timeout: 10 # optional, in seconds, default is 6
     events:
       - http:
           method: POST
@@ -153,7 +153,7 @@ functions:
     events:
       - http:
           method: GET
-          path: /auctions/{status}
+          path: /auctions/{status}/{type}
           authorizer:
             name: PrivateAuthorizer
             type: COGNITO_USER_POOLS
@@ -200,7 +200,7 @@ functions:
               - email
 resources:
   Resources:
-    # This response is needed for custom authorizer failures cors support ¯\_(ツ)_/¯
+    # This response is needed for custom authorizer failures cors support
     GatewayResponse:
       Type: 'AWS::ApiGateway::GatewayResponse'
       Properties:

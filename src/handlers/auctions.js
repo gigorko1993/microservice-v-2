@@ -1,12 +1,4 @@
-const {
-  putAuction,
-  deleteAuction,
-  findAuctionById,
-  scanAuctions,
-  addBid,
-  closeAuction,
-  getEndedAuctions,
-} = require("./auctionManager");
+const { closeAuction, getEndedAuctions } = require("./auctionManager");
 const { createResponse } = require("./responseHandler");
 const baseService = require("../helpers/baseService");
 const { db } = require("../helpers/db");
@@ -50,8 +42,8 @@ const createAuction = async event =>
         auction
       );
 
-      const res = await Auction.create({...auction});
-      console.log("🚀 ~ file: auctions.js:60 ~ res:", res)
+      const res = await Auction.create({ ...auction });
+      console.log("🚀 ~ file: auctions.js:60 ~ res:", res);
       return {
         body: res,
       };
@@ -61,85 +53,115 @@ const createAuction = async event =>
     }
   });
 
-const deleteAuctionById = (auctionId, callback) => {
-  deleteAuction(auctionId)
-    .then(res => {
-      console.log("response: ", res);
-      callback(null, createResponse(200, res));
-    })
-    .catch(err => {
-      console.log(err);
-      callback(null, createResponse(500, "Error on saving auction"));
+const deleteAuctionById = async event =>
+  baseService(async sequelize => {
+    const { auctionId } = event.pathParameters;
+    console.log("🚀 ~ file: auctions.js:67 ~ auctionId:", auctionId);
+
+    const { Auction } = await db(sequelize);
+    const auction = await Auction.destroy({
+      where: {
+        id: auctionId,
+      },
     });
-};
-const findAuction = (auctionId, callback) => {
-  const auction = findAuctionById(auctionId)
-    .then(res => {
-      console.log("response: ", res);
-      callback(null, createResponse(200, res));
-    })
-    .catch(err => {
-      console.log(err);
-      callback(null, createResponse(500, "Error on saving auction"));
-    });
-  console.log("auction: ", auction);
-  if (!auction) {
-    throw new Error(`No auction with id: ${auctionId}`);
-  }
-};
 
-const getAuctionsList = async (status, callback) => {
-  await scanAuctions(status)
-    .then(res => {
-      console.log("response: ", res);
-      callback(null, createResponse(200, res));
-    })
-    .catch(err => {
-      console.log(err);
-      callback(null, createResponse(500, "Error on get auction list"));
-    });
-};
+    console.log("🚀 ~ file: auctions.js:75 ~ auction:", auction);
+    return { body: auction };
+  });
 
-const placeBid = async (auctionId, amount, email, nickname, callback) => {
-  const auction = await findAuctionById(auctionId);
+const findAuction = async event =>
+  baseService(async sequelize => {
+    const { auctionId } = event.pathParameters;
+    const { Auction } = await db(sequelize);
 
-  console.log("auction: ", auction);
+    const auction = await Auction.findOne({ where: { id: auctionId } });
+    return { body: auction };
+  });
 
-  // Checking if auction exist
-  if (!auction) {
-    return callback(
-      null,
-      createResponse(400, `No auction with id: ${auctionId}`)
-    );
-  }
-  // Auction status validation
-  if (auction?.status !== "Open") {
-    return callback(
-      null,
-      createResponse(
-        400,
-        `Not possible to place bid on CLOSED auction with id: ${auction.id}`
-      )
-    );
-  }
-  // Bid identity validation
-  if (email === auction?.seller) {
-    return callback(
-      null,
-      createResponse(
-        400,
+const getAuctionsList = async event =>
+  baseService(async sequelize => {
+    const { status, type } = event.pathParameters;
+    const { Auction } = await db(sequelize);
+
+    const where = { status };
+    if (type) {
+      where[type] = type;
+    }
+
+    const auctions = await Auction.findAll({ where });
+    return { body: auctions };
+  });
+
+const placeBid = async event =>
+  baseService(async sequelize => {
+    const { auctionId } = event.pathParameters;
+    const { amount } = JSON.parse(event.body);
+    const { email, "cognito:username": nickname } =
+      event.requestContext.authorizer.claims;
+
+    const { Bidder, Auction } = await db(sequelize);
+
+    const auction = await Auction.findOne({ where: { id: auctionId } });
+
+    // Checking if auction exist
+    if (!auction) {
+      console.log(`No auction with id: ${auctionId}`);
+      return { statusCode: 400, body: `No auction with id: ${auctionId}` };
+    }
+    // Auction status validation
+    if (auction?.status !== "Open") {
+      console.log(
+        `Not possible to place bid on CLOSED auction with id: ${auction.id}``Not possible to place bid on CLOSED auction with id: ${auction.id}`
+      );
+      return {
+        statusCode: 400,
+        body: `Not possible to place bid on CLOSED auction with id: ${auction.id}`,
+      };
+    }
+    // Bid identity validation
+    if (email === auction?.seller) {
+      console.log(
         `Not possible to place bid on your own auction: ${auction.seller}`
-      )
-    );
-  }
+      );
+      return {
+        statusCode: 400,
+        body: `Not possible to place bid on your own auction: ${auction.seller}`,
+      };
+    }
 
-  await addBid(auctionId, amount, email, nickname);
+    const highestBidder = await Bidder.findAll({
+      include: [{ model: Auction, where: { id: auctionId } }],
+      order: [["amount", "DESC"]],
+      limit: 1,
+    });
 
-  return callback(
-    null,
-    createResponse(204, { auctionId, amount, email, nickname })
-  );
-};
+    if (highestBidder && highestBidder.email === email) {
+      return {
+        statusCode: 204,
+        body: highestBidder,
+        message: `highest bid already exist for user: ${highestBidder.email}`,
+      };
+    }
+
+    const bidderExist = await Bidder.findOne({
+      where: { auction_id, email, nickname },
+    });
+    if (bidderExist) {
+      const updateBidder = await bidderExist.update({
+        bid,
+      });
+      return { statusCode: 200, body: updateBidder };
+    } else {
+      const bidderInfo = {
+        email,
+        nickname,
+        bid: amount,
+        auction_id: auctionId,
+      };
+      const result = await Bidder.create({ ...bidderInfo });
+      return { body: result };
+    }
+  });
 
 const processAuctions = async (_event, _context, callback) => {
   try {

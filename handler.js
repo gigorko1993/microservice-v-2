@@ -4,64 +4,20 @@ const {
   findAuction,
   getAuctionsList,
   placeBid,
+  getByType,
 } = require("./src/handlers/auctions");
 const { createResponse } = require("./src/handlers/responseHandler");
 
-// const createAuctionHandler = async (event, context, callback) => {
-//   if (event.httpMethod === "POST") {
-//     const { title, price, type } = JSON.parse(event.body);
+const createAuctionHandler = async (event) => 
+    createAuction(event);
 
+const deleteAuctionHandler = async (event) =>  deleteAuctionById(event);
 
-//     const authorizer = event.requestContext;
-//     console.log("🚀 ~ file: handler.js:15 ~ createAuctionHandler ~ authorizer:", authorizer)
-//     const authorizer2 = event.requestContext.authorizer;
-//     console.log("🚀 ~ file: handler.js:17 ~ createAuctionHandler ~ authorizer2:", authorizer2)
-//     const { email } = event.requestContext.authorizer.claims;
+const findAuctionByIdHandler = async (event) => findAuction(event);
 
-//     createAuction(title, email, email, price, type, callback);
-//   } else {
-//     callback(null, createResponse(404, "Error on hello"));
-//   }
-// };
-const createAuctionHandler = async (event) => createAuction(event);
-const deleteAuctionHandler = (event, context, callback) => {
-  if (event.httpMethod === "DELETE") {
-    const { auctionId } = event.pathParameters;
+const getAuctionsListHandler = async (event) => getAuctionsList(event);
 
-    deleteAuctionById(auctionId, callback);
-  } else {
-    callback(null, createResponse(404, "Error on deleteAuctionHandler"));
-  }
-};
-const findAuctionByIdHandler = (event, context, callback) => {
-  if (event.httpMethod === "GET") {
-    const { auctionId } = event.pathParameters;
-
-    findAuction(auctionId, callback);
-  } else {
-    callback(null, createResponse(404, "Error on findAuctionByIdHandler"));
-  }
-};
-const getAuctionsListHandler = (event, context, callback) => {
-  if (event.httpMethod === "GET") {
-    const { status } = event.pathParameters;
-
-    getAuctionsList(status, callback);
-  } else {
-    callback(null, createResponse(404, "Error on getAuctionsListHandler"));
-  }
-};
-const placeBidHandler = (event, context, callback) => {
-  if (event.httpMethod === "PATCH") {
-    const { auctionId } = event.pathParameters;
-    const { amount } = JSON.parse(event.body);
-    const { email, 'cognito:username': nickname } = event.requestContext.authorizer.claims;
-
-    placeBid(auctionId, amount, email, nickname, callback);
-  } else {
-    callback(null, createResponse(404, "Error on getAuctionsListHandler"));
-  }
-};
+const placeBidHandler = async (event) => placeBid(event);
 
 module.exports = {
   createAuctionHandler,
